@@ -1,0 +1,127 @@
+services:
+
+  postgres-users:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: users_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5440:5432"]
+    volumes: [users_data:/var/lib/postgresql/data]
+    networks: [smartcommerce]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-products:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: products_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5441:5432"]
+    volumes: [products_data:/var/lib/postgresql/data]
+    networks: [smartcommerce]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-orders:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: orders_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5442:5432"]
+    volumes: [orders_data:/var/lib/postgresql/data]
+    networks: [smartcommerce]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-recommendations:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: rec_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5443:5432"]
+    volumes: [rec_data:/var/lib/postgresql/data]
+    networks: [smartcommerce]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-service:
+    build: ../services/user-service
+    ports: ["3001:3001"]
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@postgres-users:5432/users_db
+      JWT_SECRET: dev-secret-change-in-production
+      NODE_ENV: development
+    depends_on:
+      postgres-users: { condition: service_healthy }
+    networks: [smartcommerce]
+    volumes: [../services/user-service/src:/app/src]
+
+  product-service:
+    build: ../services/product-service
+    ports: ["3002:3002"]
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://postgres:postgres@postgres-products:5432/products_db
+      NODE_ENV: development
+    depends_on:
+      postgres-products: { condition: service_healthy }
+    networks: [smartcommerce]
+    volumes: [../services/product-service/src:/app/src]
+
+  order-service:
+    build: ../services/order-service
+    ports: ["3003:3003"]
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://postgres:postgres@postgres-orders:5432/orders_db
+      NODE_ENV: development
+    depends_on:
+      postgres-orders: { condition: service_healthy }
+    networks: [smartcommerce]
+    volumes: [../services/order-service/src:/app/src]
+
+  recommendation-service:
+    build: ../services/recommendation-service
+    ports: ["3004:3004"]
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgresql://postgres:postgres@postgres-recommendations:5432/rec_db
+      NODE_ENV: development
+    depends_on:
+      postgres-recommendations: { condition: service_healthy }
+    networks: [smartcommerce]
+    volumes: [../services/recommendation-service/src:/app/src]
+
+  nginx:
+    image: nginx:alpine
+    ports: ["80:80"]
+    volumes: [../gateway/nginx/nginx.conf:/etc/nginx/nginx.conf:ro]
+    depends_on: [user-service, product-service, order-service, recommendation-service]
+    networks: [smartcommerce]
+
+volumes:
+  users_data:
+  products_data:
+  orders_data:
+  rec_data:
+
+networks:
+  smartcommerce:
+    driver: bridge
