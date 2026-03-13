@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { productsAPI, cartAPI } from '../../../lib/api';
+import { productsAPI, cartAPI, recommendationsAPI } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
+import RecommendationRow from '../../../components/RecommendationRow';
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -15,10 +16,16 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     productsAPI.get(id as string)
-      .then(res => setProduct(res.data.product))
+      .then(res => {
+        setProduct(res.data.product);
+        // Track view event if logged in
+        if (user) {
+          recommendationsAPI.track(id as string, 'view').catch(() => {});
+        }
+      })
       .catch(() => router.push('/products'))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, user]);
 
   const addToCart = async () => {
     if (!user) { router.push('/login'); return; }
@@ -31,6 +38,8 @@ export default function ProductDetailPage() {
         quantity,
         image_url: product.image_url,
       });
+      // Track cart_add event
+      await recommendationsAPI.track(product.id, 'cart_add').catch(() => {});
       router.push('/cart');
     } catch (err) {
       alert('Failed to add to cart');
@@ -43,7 +52,7 @@ export default function ProductDetailPage() {
   if (!product) return null;
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         <div className="md:flex">
           <div className="md:w-1/2">
@@ -64,22 +73,18 @@ export default function ProductDetailPage() {
             <div className="mt-6">
               <span className="text-4xl font-bold text-gray-900">${product.price}</span>
             </div>
-            <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+            <div className="mt-4 text-sm">
               <span className={product.stock > 0 ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
                 {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
               </span>
             </div>
             <div className="mt-6 flex items-center gap-4">
               <div className="flex items-center border border-gray-300 rounded-lg">
-                <button
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                  className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-l-lg transition"
-                >−</button>
+                <button onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-l-lg transition">−</button>
                 <span className="px-4 py-2 font-medium">{quantity}</span>
-                <button
-                  onClick={() => setQuantity(q => Math.min(product.stock, q + 1))}
-                  className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-r-lg transition"
-                >+</button>
+                <button onClick={() => setQuantity(q => Math.min(product.stock, q + 1))}
+                  className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-r-lg transition">+</button>
               </div>
               <button
                 onClick={addToCart}
@@ -92,6 +97,12 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Similar Products */}
+      <RecommendationRow
+        title="You May Also Like"
+        fetchFn={() => recommendationsAPI.similar(id as string, 4)}
+      />
     </div>
   );
 }

@@ -1,26 +1,18 @@
 import axios from 'axios';
 
-// When running in browser: use empty string = relative URLs (same host)
-// This works whether frontend is on :3000 or :80
-const API_BASE = typeof window !== 'undefined' ? '' : 'http://nginx:80';
-
 const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: '',
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach JWT token to every request automatically
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Auth
 export const authAPI = {
   register: (data: { name: string; email: string; password: string }) =>
     api.post('/api/auth/register', data),
@@ -29,7 +21,6 @@ export const authAPI = {
   profile: () => api.get('/api/auth/profile'),
 };
 
-// Products
 export const productsAPI = {
   list: (params?: { search?: string; category?: string; page?: number; limit?: number }) =>
     api.get('/api/products', { params }),
@@ -37,7 +28,6 @@ export const productsAPI = {
   categories: () => api.get('/api/categories'),
 };
 
-// Cart
 export const cartAPI = {
   get: () => api.get('/api/cart'),
   add: (item: { product_id: string; product_name: string; price: number; quantity: number; image_url?: string }) =>
@@ -48,12 +38,22 @@ export const cartAPI = {
   clear: () => api.delete('/api/cart'),
 };
 
-// Orders
 export const ordersAPI = {
   list: () => api.get('/api/orders'),
   get: (id: string) => api.get(`/api/orders/${id}`),
   checkout: (data: { shipping_address: string; payment_method: string }) =>
     api.post('/api/orders/checkout', data),
+};
+
+export const recommendationsAPI = {
+  forYou: (limit = 8) =>
+    api.get('/api/recommendations/for-you', { params: { limit } }),
+  similar: (productId: string, limit = 6) =>
+    api.get(`/api/recommendations/similar/${productId}`, { params: { limit } }),
+  popular: (limit = 8) =>
+    api.get('/api/recommendations/popular', { params: { limit } }),
+  track: (product_id: string, action: 'view' | 'cart_add' | 'purchase') =>
+    api.post('/api/recommendations/track', { product_id, action }),
 };
 
 export default api;

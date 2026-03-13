@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { productsAPI } from '../../lib/api';
+import { productsAPI, recommendationsAPI } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import ProductCard from '../../components/ProductCard';
+import RecommendationRow from '../../components/RecommendationRow';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -11,6 +13,7 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -29,13 +32,11 @@ export default function ProductsPage() {
     productsAPI.categories().then(res => setCategories(res.data.categories));
   }, []);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [search, category, page]);
+  useEffect(() => { fetchProducts(); }, [search, category, page]);
 
   return (
     <div>
-      {/* Search + Filter Bar */}
+      {/* Search + Filter */}
       <div className="flex flex-col sm:flex-row gap-4 mb-8">
         <input
           type="text"
@@ -60,9 +61,7 @@ export default function ProductsPage() {
       {loading ? (
         <div className="flex justify-center items-center h-64 text-gray-500">Loading products...</div>
       ) : products.length === 0 ? (
-        <div className="text-center text-gray-500 h-64 flex items-center justify-center">
-          No products found
-        </div>
+        <div className="text-center text-gray-500 h-64 flex items-center justify-center">No products found</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products.map((product: any) => (
@@ -79,15 +78,26 @@ export default function ProductsPage() {
               key={p}
               onClick={() => setPage(p)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                p === page
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                p === page ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
               {p}
             </button>
           ))}
         </div>
+      )}
+
+      {/* Recommendation Rows */}
+      {user ? (
+        <RecommendationRow
+          title="Recommended For You"
+          fetchFn={() => recommendationsAPI.forYou(4)}
+        />
+      ) : (
+        <RecommendationRow
+          title="Popular Right Now"
+          fetchFn={() => recommendationsAPI.popular(4)}
+        />
       )}
     </div>
   );

@@ -109,9 +109,12 @@ services:
     environment:
       PORT: 3004
       DATABASE_URL: postgresql://postgres:postgres@postgres-recommendations:5432/rec_db
+      JWT_SECRET: dev-secret-change-in-production
       NODE_ENV: development
+      PRODUCT_SERVICE_URL: http://product-service:3002
     depends_on:
       postgres-recommendations: { condition: service_healthy }
+      product-service: { condition: service_started }
     networks: [smartcommerce]
     volumes: [../services/recommendation-service/src:/app/src]
 
