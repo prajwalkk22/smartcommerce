@@ -3,6 +3,7 @@ const express = require('express');
 const migrate = require('./migrate');
 const cartRoutes = require('./routes/cart');
 const orderRoutes = require('./routes/orders');
+const fraudRoutes = require('./routes/fraud');
 
 const app = express();
 app.use(express.json());
@@ -13,6 +14,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/fraud', fraudRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 

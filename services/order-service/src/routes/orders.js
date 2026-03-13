@@ -2,10 +2,12 @@ const express = require('express');
 const pool = require('../db');
 const authMiddleware = require('../middleware/auth');
 const { processPayment } = require('./payment');
+const { runFraudCheck } = require('../fraud/detector');
+const { logFraudEvent, logPaymentAttempt } = require('../fraud/logger');
 
 const router = express.Router();
 
-// GET /api/orders — get user's order history
+// GET /api/orders
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const orders = await pool.query(
@@ -13,7 +15,6 @@ router.get('/', authMiddleware, async (req, res) => {
       [req.user.userId]
     );
 
-    // Get items for each order
     const ordersWithItems = await Promise.all(
       orders.rows.map(async (order) => {
         const items = await pool.query(
@@ -31,7 +32,7 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/orders/:id — single order
+// GET /api/orders/:id
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const order = await pool.query(
@@ -54,10 +55,10 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/orders/checkout — create order from cart + process payment
-// Body: { shipping_address, payment_method }
+// POST /api/orders/checkout
 router.post('/checkout', authMiddleware, async (req, res) => {
   const { shipping_address, payment_method = 'card_test_4242' } = req.body;
+  const ipAddress = req.headers['x-real-ip'] || req.ip;
 
   if (!shipping_address) {
     return res.status(400).json({ error: 'Shipping address is required' });
@@ -66,7 +67,6 @@ router.post('/checkout', authMiddleware, async (req, res) => {
   const client = await pool.connect();
 
   try {
-    // Begin transaction — all or nothing
     await client.query('BEGIN');
 
     // 1. Get cart items
@@ -85,47 +85,88 @@ router.post('/checkout', authMiddleware, async (req, res) => {
       (sum, item) => sum + parseFloat(item.price) * item.quantity, 0
     );
 
-    // 2. Process payment BEFORE creating order
+    // 2. Run fraud detection BEFORE payment
+    console.log(`[Fraud] Running check for user ${req.user.userId}, amount $${totalAmount}`);
+    const fraudResult = await runFraudCheck(req.user.userId, totalAmount, ipAddress);
+
+    console.log(`[Fraud] Score: ${fraudResult.score}, Level: ${fraudResult.level}, Flags: ${fraudResult.flags.join(', ') || 'none'}`);
+
+    // 3. Block critical risk orders
+    if (fraudResult.blocked) {
+      await client.query('ROLLBACK');
+
+      // Log the blocked attempt
+      await logFraudEvent(req.user.userId, null, fraudResult, ipAddress);
+
+      return res.status(403).json({
+        error: 'Order blocked due to suspicious activity',
+        risk_level: fraudResult.level,
+        message: 'Please contact support if you believe this is a mistake',
+      });
+    }
+
+    // 4. Log medium/high risk orders (but allow them)
+    if (fraudResult.score >= 30) {
+      await logFraudEvent(req.user.userId, null, fraudResult, ipAddress);
+    }
+
+    // 5. Process payment
     const paymentResult = await processPayment({
       amount: totalAmount,
       currency: 'usd',
       paymentMethod: payment_method,
-      orderId: `pending_${req.user.userId}`
+      orderId: `pending_${req.user.userId}`,
     });
+
+    // Log payment attempt
+    await logPaymentAttempt(
+      req.user.userId,
+      totalAmount,
+      paymentResult.success ? 'success' : 'failed',
+      ipAddress
+    );
 
     if (!paymentResult.success) {
       await client.query('ROLLBACK');
       return res.status(402).json({
         error: 'Payment failed',
-        reason: paymentResult.error
+        reason: paymentResult.error,
       });
     }
 
-    // 3. Create order record
+    // 6. Create order with fraud metadata
     const orderResult = await client.query(
-      `INSERT INTO orders (user_id, total_amount, status, payment_status, payment_id, shipping_address)
-       VALUES ($1, $2, 'confirmed', 'paid', $3, $4)
+      `INSERT INTO orders
+         (user_id, total_amount, status, payment_status, payment_id, shipping_address, risk_score, fraud_flags)
+       VALUES ($1, $2, 'confirmed', 'paid', $3, $4, $5, $6)
        RETURNING *`,
-      [req.user.userId, totalAmount.toFixed(2), paymentResult.payment_id, shipping_address]
+      [
+        req.user.userId,
+        totalAmount.toFixed(2),
+        paymentResult.payment_id,
+        shipping_address,
+        fraudResult.score,
+        fraudResult.flags,
+      ]
     );
 
     const order = orderResult.rows[0];
 
-    // 4. Create order items (snapshot of cart at purchase time)
+    // 7. Create order items
     await Promise.all(
       cartItems.map(item =>
         client.query(
-          `INSERT INTO order_items (order_id, product_id, product_name, price, quantity, image_url)
+          `INSERT INTO order_items
+             (order_id, product_id, product_name, price, quantity, image_url)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [order.id, item.product_id, item.product_name, item.price, item.quantity, item.image_url]
         )
       )
     );
 
-    // 5. Clear cart after successful order
+    // 8. Clear cart
     await client.query('DELETE FROM cart_items WHERE user_id = $1', [req.user.userId]);
 
-    // Commit everything
     await client.query('COMMIT');
 
     res.status(201).json({
@@ -137,13 +178,18 @@ router.post('/checkout', authMiddleware, async (req, res) => {
           product_name: item.product_name,
           price: item.price,
           quantity: item.quantity,
-        }))
+        })),
       },
       payment: {
         payment_id: paymentResult.payment_id,
         status: paymentResult.status,
-        amount: totalAmount.toFixed(2)
-      }
+        amount: totalAmount.toFixed(2),
+      },
+      risk: {
+        score: fraudResult.score,
+        level: fraudResult.level,
+        flags: fraudResult.flags,
+      },
     });
 
   } catch (err) {
@@ -155,7 +201,7 @@ router.post('/checkout', authMiddleware, async (req, res) => {
   }
 });
 
-// PATCH /api/orders/:id/cancel — cancel order
+// PATCH /api/orders/:id/cancel
 router.patch('/:id/cancel', authMiddleware, async (req, res) => {
   try {
     const order = await pool.query(
