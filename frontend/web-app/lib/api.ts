@@ -28,6 +28,15 @@ export const productsAPI = {
   categories: () => api.get('/api/categories'),
 };
 
+export const searchAPI = {
+  search: (params: { q: string; category?: string; page?: number; limit?: number }) =>
+    api.get('/api/search', { params }),
+  suggestions: (q: string) =>
+    api.get('/api/search/suggestions', { params: { q } }),
+  trending: () =>
+    api.get('/api/search/trending'),
+};
+
 export const cartAPI = {
   get: () => api.get('/api/cart'),
   add: (item: { product_id: string; product_name: string; price: number; quantity: number; image_url?: string }) =>

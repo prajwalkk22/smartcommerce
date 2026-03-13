@@ -3,6 +3,7 @@ const express = require('express');
 const migrate = require('./migrate');
 const productRoutes = require('./routes/products');
 const categoryRoutes = require('./routes/categories');
+const searchRoutes = require('./routes/search');
 
 const app = express();
 app.use(express.json());
@@ -13,6 +14,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/search', searchRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 
@@ -26,7 +28,7 @@ const PORT = process.env.PORT || 3002;
 migrate()
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`[Product Service] Running on port ${PORT}`);
+      console.log('[Product Service] Running on port', PORT);
     });
   })
   .catch((err) => {
