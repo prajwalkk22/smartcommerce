@@ -79,7 +79,12 @@ services:
     environment:
       PORT: 3002
       DATABASE_URL: postgresql://postgres:postgres@postgres-products:5432/products_db
+      JWT_SECRET: dev-secret-change-in-production
       NODE_ENV: development
+      AWS_BUCKET_NAME: ""
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ""
+      AWS_SECRET_ACCESS_KEY: ""
     depends_on:
       postgres-products: { condition: service_healthy }
     networks: [smartcommerce]
@@ -91,6 +96,7 @@ services:
     environment:
       PORT: 3003
       DATABASE_URL: postgresql://postgres:postgres@postgres-orders:5432/orders_db
+      JWT_SECRET: dev-secret-change-in-production
       NODE_ENV: development
     depends_on:
       postgres-orders: { condition: service_healthy }
