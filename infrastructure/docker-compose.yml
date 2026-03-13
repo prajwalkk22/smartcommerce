@@ -133,11 +133,33 @@ services:
     depends_on: [user-service, product-service, order-service, recommendation-service, frontend]
     networks: [smartcommerce]
 
+  prometheus:
+    image: prom/prometheus:latest
+    ports: ["9090:9090"]
+    volumes: [./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro]
+    networks: [smartcommerce]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus"]
+
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["3005:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    depends_on: [prometheus]
+    networks: [smartcommerce]
+
 volumes:
   users_data:
   products_data:
   orders_data:
   rec_data:
+  grafana_data:
 
 networks:
   smartcommerce:
