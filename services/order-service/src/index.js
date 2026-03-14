@@ -76,7 +76,7 @@ app.use((err, req, res, next) => { log('error', 'unhandled_error', { error: err.
 
 const PORT = process.env.PORT || 3003;
 migrate().then(() => {
-  const server = app.listen(PORT, () => log('info', 'service_started', { port: PORT }));
+  const server = app.listen(PORT, '0.0.0.0', () => log('info', 'service_started', { port: PORT }));
   const shutdown = async (signal) => { log('info', `shutdown_${signal}`); server.close(async () => { await pool.end().catch(() => {}); process.exit(0); }); setTimeout(() => process.exit(1), 10000); };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT',  () => shutdown('SIGINT'));

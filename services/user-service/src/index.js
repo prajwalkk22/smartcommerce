@@ -89,7 +89,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 migrate().then(() => {
-  const server = app.listen(PORT, () => log('info', 'service_started', { port: PORT }));
+  const server = app.listen(PORT, '0.0.0.0', () => log('info', 'service_started', { port: PORT }));
 
   // Graceful shutdown
   const shutdown = async (signal) => {
