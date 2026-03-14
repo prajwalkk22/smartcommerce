@@ -1,68 +1,53 @@
 import axios from 'axios';
 
-const api = axios.create({
-  baseURL: '',
-  headers: { 'Content-Type': 'application/json' },
-});
+const USER_SERVICE    = process.env.NEXT_PUBLIC_USER_SERVICE_URL    || 'https://user-service-w1v3.onrender.com';
+const PRODUCT_SERVICE = process.env.NEXT_PUBLIC_PRODUCT_SERVICE_URL || 'https://product-service-be0f.onrender.com';
+const ORDER_SERVICE   = process.env.NEXT_PUBLIC_ORDER_SERVICE_URL   || 'https://order-service-ed7k.onrender.com';
+const REC_SERVICE     = process.env.NEXT_PUBLIC_REC_SERVICE_URL     || 'https://recommendation-service-3ypl.onrender.com';
 
-api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+function authHeader() {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export const authAPI = {
-  register: (data: { name: string; email: string; password: string }) =>
-    api.post('/api/auth/register', data),
-  login: (data: { email: string; password: string }) =>
-    api.post('/api/auth/login', data),
-  profile: () => api.get('/api/auth/profile'),
+  register: (data: any) => axios.post(`${USER_SERVICE}/api/auth/register`, data),
+  login:    (data: any) => axios.post(`${USER_SERVICE}/api/auth/login`, data),
+  profile:  ()         => axios.get(`${USER_SERVICE}/api/auth/profile`, { headers: authHeader() }),
 };
 
 export const productsAPI = {
-  list: (params?: { search?: string; category?: string; page?: number; limit?: number }) =>
-    api.get('/api/products', { params }),
-  get: (id: string) => api.get(`/api/products/${id}`),
-  categories: () => api.get('/api/categories'),
+  list:       (params?: any) => axios.get(`${PRODUCT_SERVICE}/api/products`, { params }),
+  get:        (id: string)   => axios.get(`${PRODUCT_SERVICE}/api/products/${id}`),
+  categories: ()             => axios.get(`${PRODUCT_SERVICE}/api/categories`),
 };
 
 export const searchAPI = {
-  search: (params: { q: string; category?: string; page?: number; limit?: number }) =>
-    api.get('/api/search', { params }),
-  suggestions: (q: string) =>
-    api.get('/api/search/suggestions', { params: { q } }),
-  trending: () =>
-    api.get('/api/search/trending'),
+  search:      (params: any) => axios.get(`${PRODUCT_SERVICE}/api/search`, { params }),
+  suggestions: (q: string)   => axios.get(`${PRODUCT_SERVICE}/api/search/suggestions`, { params: { q } }),
+  trending:    ()            => axios.get(`${PRODUCT_SERVICE}/api/search/trending`),
 };
 
 export const cartAPI = {
-  get: () => api.get('/api/cart'),
-  add: (item: { product_id: string; product_name: string; price: number; quantity: number; image_url?: string }) =>
-    api.post('/api/cart', item),
-  update: (productId: string, quantity: number) =>
-    api.put(`/api/cart/${productId}`, { quantity }),
-  remove: (productId: string) => api.delete(`/api/cart/${productId}`),
-  clear: () => api.delete('/api/cart'),
+  get:    ()                        => axios.get(`${ORDER_SERVICE}/api/cart`, { headers: authHeader() }),
+  add:    (item: any)               => axios.post(`${ORDER_SERVICE}/api/cart`, item, { headers: authHeader() }),
+  update: (id: string, qty: number) => axios.put(`${ORDER_SERVICE}/api/cart/${id}`, { quantity: qty }, { headers: authHeader() }),
+  remove: (id: string)              => axios.delete(`${ORDER_SERVICE}/api/cart/${id}`, { headers: authHeader() }),
+  clear:  ()                        => axios.delete(`${ORDER_SERVICE}/api/cart`, { headers: authHeader() }),
 };
 
 export const ordersAPI = {
-  list: () => api.get('/api/orders'),
-  get: (id: string) => api.get(`/api/orders/${id}`),
-  checkout: (data: { shipping_address: string; payment_method: string }) =>
-    api.post('/api/orders/checkout', data),
+  list:     ()           => axios.get(`${ORDER_SERVICE}/api/orders`, { headers: authHeader() }),
+  get:      (id: string) => axios.get(`${ORDER_SERVICE}/api/orders/${id}`, { headers: authHeader() }),
+  checkout: (data: any)  => axios.post(`${ORDER_SERVICE}/api/orders/checkout`, data, { headers: authHeader() }),
 };
 
 export const recommendationsAPI = {
-  forYou: (limit = 8) =>
-    api.get('/api/recommendations/for-you', { params: { limit } }),
-  similar: (productId: string, limit = 6) =>
-    api.get(`/api/recommendations/similar/${productId}`, { params: { limit } }),
-  popular: (limit = 8) =>
-    api.get('/api/recommendations/popular', { params: { limit } }),
-  track: (product_id: string, action: 'view' | 'cart_add' | 'purchase') =>
-    api.post('/api/recommendations/track', { product_id, action }),
+  forYou:  (limit = 8)                    => axios.get(`${REC_SERVICE}/api/recommendations/for-you`, { params: { limit }, headers: authHeader() }),
+  similar: (productId: string, limit = 6) => axios.get(`${REC_SERVICE}/api/recommendations/similar/${productId}`, { params: { limit } }),
+  popular: (limit = 8)                    => axios.get(`${REC_SERVICE}/api/recommendations/popular`, { params: { limit } }),
+  track:   (product_id: string, action: string) => axios.post(`${REC_SERVICE}/api/recommendations/track`, { product_id, action }, { headers: authHeader() }),
 };
 
-export default api;
+export default axios;
