@@ -6,11 +6,9 @@ const recommendationRoutes = require('./routes/recommendations');
 
 const app = express();
 app.use(express.json());
-
-const SERVICE = 'recommendation-service';
+const SERVICE = 'recommendation_service';
 const log = (level, event, data = {}) =>
   console.log(JSON.stringify({ ts: new Date().toISOString(), level, service: SERVICE, event, ...data }));
-
 const metrics = { requests: {}, errors: {}, durations: [] };
 
 app.use((req, res, next) => {
@@ -18,13 +16,13 @@ app.use((req, res, next) => {
   res.setHeader('X-Trace-Id', req.traceId);
   const start = Date.now();
   res.on('finish', () => {
-    const duration = Date.now() - start;
-    const key = `${req.method}_${res.statusCode}`;
-    metrics.requests[key] = (metrics.requests[key] || 0) + 1;
-    metrics.durations.push(duration);
+    const ms = Date.now() - start;
+    const k = `${req.method}_${res.statusCode}`;
+    metrics.requests[k] = (metrics.requests[k] || 0) + 1;
+    metrics.durations.push(ms);
     if (metrics.durations.length > 1000) metrics.durations.shift();
-    if (res.statusCode >= 400) metrics.errors[key] = (metrics.errors[key] || 0) + 1;
-    log('info', 'http_request', { traceId: req.traceId, method: req.method, path: req.path, status: res.statusCode, duration_ms: duration });
+    if (res.statusCode >= 400) metrics.errors[k] = (metrics.errors[k] || 0) + 1;
+    log('info', 'http_request', { traceId: req.traceId, method: req.method, path: req.path, status: res.statusCode, duration_ms: ms });
   });
   next();
 });
@@ -32,33 +30,34 @@ app.use((req, res, next) => {
 app.get('/health', (req, res) => res.json({ service: SERVICE, status: 'ok' }));
 
 app.get('/metrics', (req, res) => {
-  const sorted = [...metrics.durations].sort((a, b) => a - b);
-  const p50 = sorted[Math.floor(sorted.length * 0.5)] || 0;
-  const p95 = sorted[Math.floor(sorted.length * 0.95)] || 0;
-  const p99 = sorted[Math.floor(sorted.length * 0.99)] || 0;
+  const s = [...metrics.durations].sort((a, b) => a - b);
+  const p50 = s[Math.floor(s.length * 0.5)] || 0;
+  const p95 = s[Math.floor(s.length * 0.95)] || 0;
+  const p99 = s[Math.floor(s.length * 0.99)] || 0;
   const total = Object.values(metrics.requests).reduce((a, b) => a + b, 0);
   const errors = Object.values(metrics.errors).reduce((a, b) => a + b, 0);
-  res.set('Content-Type', 'text/plain');
-  res.send([
-    `# TYPE ${SERVICE}_http_requests_total counter`,
-    `${SERVICE}_http_requests_total ${total}`,
-    `# TYPE ${SERVICE}_http_errors_total counter`,
-    `${SERVICE}_http_errors_total ${errors}`,
-    `# TYPE ${SERVICE}_http_duration_ms summary`,
-    `${SERVICE}_http_duration_ms{quantile="0.5"} ${p50}`,
-    `${SERVICE}_http_duration_ms{quantile="0.95"} ${p95}`,
-    `${SERVICE}_http_duration_ms{quantile="0.99"} ${p99}`,
-  ].join('\n'));
+  res.set('Content-Type', 'text/plain; version=0.0.4');
+  res.send(
+    `# HELP ${SERVICE}_http_requests_total Total requests\n` +
+    `# TYPE ${SERVICE}_http_requests_total counter\n` +
+    `${SERVICE}_http_requests_total ${total}\n` +
+    `\n` +
+    `# HELP ${SERVICE}_http_errors_total Total errors\n` +
+    `# TYPE ${SERVICE}_http_errors_total counter\n` +
+    `${SERVICE}_http_errors_total ${errors}\n` +
+    `\n` +
+    `# HELP ${SERVICE}_http_duration_ms Request duration\n` +
+    `# TYPE ${SERVICE}_http_duration_ms summary\n` +
+    `${SERVICE}_http_duration_ms{quantile="0.5"} ${p50}\n` +
+    `${SERVICE}_http_duration_ms{quantile="0.95"} ${p95}\n` +
+    `${SERVICE}_http_duration_ms{quantile="0.99"} ${p99}\n`
+  );
 });
 
 app.use('/api/recommendations', recommendationRoutes);
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
-app.use((err, req, res, next) => {
-  log('error', 'unhandled_error', { error: err.message });
-  res.status(500).json({ error: 'Internal server error' });
-});
+app.use((err, req, res, next) => { log('error', 'unhandled_error', { error: err.message }); res.status(500).json({ error: 'Internal server error' }); });
 
 const PORT = process.env.PORT || 3004;
-migrate().then(() => {
-  app.listen(PORT, () => log('info', 'service_started', { port: PORT }));
-}).catch(err => { log('error', 'startup_failed', { error: err.message }); process.exit(1); });
+migrate().then(() => app.listen(PORT, () => log('info', 'service_started', { port: PORT })))
+  .catch(err => { log('error', 'startup_failed', { error: err.message }); process.exit(1); });
