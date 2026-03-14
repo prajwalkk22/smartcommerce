@@ -3,11 +3,8 @@ const pool = require('./db');
 async function migrate() {
   const client = await pool.connect();
   try {
-    await client.query(`CREATE SCHEMA IF NOT EXISTS users;`);
-    await client.query(`SET search_path TO users;`);
-
     await client.query(`
-      CREATE TABLE IF NOT EXISTS users.users (
+      CREATE TABLE IF NOT EXISTS users (
         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name       VARCHAR(100) NOT NULL,
         email      VARCHAR(255) UNIQUE NOT NULL,
@@ -19,7 +16,7 @@ async function migrate() {
     `);
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS users.user_activity (
+      CREATE TABLE IF NOT EXISTS user_activity (
         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id    UUID NOT NULL,
         action     VARCHAR(100),
