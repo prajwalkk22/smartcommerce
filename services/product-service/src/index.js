@@ -10,6 +10,17 @@ const searchRoutes = require('./routes/search');
 const app = express();
 app.use(express.json({ limit: '10kb' }));
 
+// CORS for Render (no NGINX)
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
+
+
+
 const SERVICE = 'product_service';
 const log = (level, event, data = {}) =>
   console.log(JSON.stringify({ ts: new Date().toISOString(), level, service: SERVICE, event, ...data }));
