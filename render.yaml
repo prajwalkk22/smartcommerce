@@ -17,7 +17,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
-        generateValue: true
+        value: smartcommerce-prod-secret-2026
       - key: DATABASE_URL
         fromDatabase:
           name: smartcommerce-db
@@ -35,7 +35,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
-        sync: false
+        value: smartcommerce-prod-secret-2026
       - key: DATABASE_URL
         fromDatabase:
           name: smartcommerce-db
@@ -53,7 +53,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
-        sync: false
+        value: smartcommerce-prod-secret-2026
       - key: DATABASE_URL
         fromDatabase:
           name: smartcommerce-db
@@ -71,31 +71,27 @@ services:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
-        sync: false
+        value: smartcommerce-prod-secret-2026
       - key: DATABASE_URL
         fromDatabase:
           name: smartcommerce-db
           property: connectionString
       - key: PRODUCT_SERVICE_URL
-        sync: false
+        value: https://product-service-be0f.onrender.com
 
   - type: web
     name: smartcommerce-frontend
-    # frontend
     runtime: docker
     dockerfilePath: ./frontend/web-app/Dockerfile
     dockerContext: ./frontend/web-app
     plan: free
+    dockerBuildArgs:
+      - NEXT_PUBLIC_USER_SERVICE_URL=https://user-service-w1v3.onrender.com
+      - NEXT_PUBLIC_PRODUCT_SERVICE_URL=https://product-service-be0f.onrender.com
+      - NEXT_PUBLIC_ORDER_SERVICE_URL=https://order-service-ed7k.onrender.com
+      - NEXT_PUBLIC_REC_SERVICE_URL=https://recommendation-service-3ypl.onrender.com
+      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dtnntuqrs
+      - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=smartcommerce
     envVars:
       - key: PORT
         value: 10000
-      - key: NODE_ENV
-        value: production
-      - key: NEXT_PUBLIC_USER_SERVICE_URL
-        sync: false
-      - key: NEXT_PUBLIC_PRODUCT_SERVICE_URL
-        sync: false
-      - key: NEXT_PUBLIC_ORDER_SERVICE_URL
-        sync: false
-      - key: NEXT_PUBLIC_REC_SERVICE_URL
-        sync: false
