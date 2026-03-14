@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    domains: ['picsum.photos', 'via.placeholder.com'],
+  output: 'standalone',
+  experimental: {
+    appDir: true,
   },
 }
+
 module.exports = nextConfig

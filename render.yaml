@@ -81,6 +81,7 @@ services:
 
   - type: web
     name: smartcommerce-frontend
+    # frontend
     runtime: docker
     dockerfilePath: ./frontend/web-app/Dockerfile
     dockerContext: ./frontend/web-app
